@@ -1734,6 +1734,7 @@ add_new_user(From, Nick, {xmlelement, _, Attrs, Els} = Packet, StateData) ->
 		       StateData#state.server_host,
 		       mod_muc, max_user_conferences, 10),
     Collision = nick_collision(From, Nick, StateData),
+    ?INFO_MSG("skiping validation of maxusers for group chat", []),
     case {(ServiceAffiliation == owner orelse
 	   ((Affiliation == admin orelse Affiliation == owner) andalso
 	    NUsers < MaxAdminUsers) orelse
@@ -1742,15 +1743,15 @@ add_new_user(From, Nick, {xmlelement, _, Attrs, Els} = Packet, StateData) ->
 	  Collision,
 	  mod_muc:can_use_nick(StateData#state.host, From, Nick),
 	  get_default_role(Affiliation, StateData)} of
-	{false, _, _, _} ->
-	    % max user reached and user is not admin or owner
-	    Err = jlib:make_error_reply(
-		    Packet,
-		    ?ERR_SERVICE_UNAVAILABLE),
-	    ejabberd_router:route( % TODO: s/Nick/""/
-	      jlib:jid_replace_resource(StateData#state.jid, Nick),
-	      From, Err),
-	    StateData;
+%%	{false, _, _, _} ->
+%%	    % max user reached and user is not admin or owner
+%%	    Err = jlib:make_error_reply(
+%%		    Packet,
+%%		    ?ERR_SERVICE_UNAVAILABLE),
+%%	    ejabberd_router:route( % TODO: s/Nick/""/
+%%	      jlib:jid_replace_resource(StateData#state.jid, Nick),
+%%	      From, Err),
+%%	    StateData;
 	{_, _, _, none} ->
 	    Err = jlib:make_error_reply(
 		    Packet,
