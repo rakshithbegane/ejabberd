@@ -50,6 +50,8 @@
 -include("jlib.hrl").
 -include("mod_muc_room.hrl").
 
+-import(mod_archive_odbc, [get_collection_id/1]).
+
 -define(MAX_USERS_DEFAULT_LIST,
 	[5, 10, 20, 30, 50, 100, 200, 500, 1000, 2000, 5000]).
 
@@ -127,6 +129,13 @@ init([Host, ServerHost, Access, Room, HistorySize, RoomShaper, Creator, _Nick, D
 	      [Room, Host, jlib:jid_to_string(Creator)]),
     add_to_log(room_existence, created, State1),
     add_to_log(room_existence, started, State1),
+    #jid{luser = LUser, lserver = LServer, lresource = LResource} = Creator,
+	RoomJID = {State#state.room, State#state.host, ""}, 
+	?INFO_MSG("LServer: ~p; LUser: ~p; JID: ~p ", [LServer, LUser, RoomJID]),
+    F = fun() ->
+		CID = mod_archive_odbc:get_collection_id_affiliation({LUser, LServer, RoomJID, get_timestamp(), "owner"})
+	end,
+	mod_archive_odbc:run_sql_transaction(LServer, F),    
     {ok, normal_state, State1};
 init([Host, ServerHost, Access, Room, HistorySize, RoomShaper, Opts]) ->
     process_flag(trap_exit, true),
@@ -3974,9 +3983,24 @@ check_invitation(From, Els, Lang, StateData) ->
 			       ""})}],
 		   [{xmlcdata, Reason}]},
 		  Body]},
+		%% save in archive_collection for invites
+		#jid{luser = LUser, lserver = LServer, lresource = LResource} = JID,
+		RoomJID = {StateData#state.room, StateData#state.host, ""},
+		%% RoomJID = jlib:string_to_jid(StateData#state.room ++ "@" ++ StateData#state.host),
+		%?INFO_MSG("LServer: ~p; LUser: ~p; JID: ~p ", [LServer, LUser, RoomJID]),
+		F = fun() ->
+			CID = mod_archive_odbc:get_collection_id_affiliation({LUser, LServer, RoomJID, get_timestamp(), "member"})
+		end,
+		mod_archive_odbc:run_sql_transaction(LServer, F),
+		%erlang:apply(mod_archive_odbc, get_collection_id, [{LUser, LServer, JID, get_timestamp()}]),
+		%?INFO_MSG("After inserting into collection; ", []),
 	    ejabberd_router:route(StateData#state.jid, JID, Msg),
 	    JID
     end.
+
+
+get_timestamp() ->
+    calendar:datetime_to_gregorian_seconds(calendar:universal_time()).
 
 %% Handle a message sent to the room by a non-participant.
 %% If it is a decline, send to the inviter.
